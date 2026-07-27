@@ -20,6 +20,7 @@ import { AcceptIntentDto } from "./dto/accept-intent.dto";
 import { FillIntentDto } from "./dto/fill-intent.dto";
 import { CancelIntentDto } from "./dto/cancel-intent.dto";
 import { QuoteRequestDto } from "./dto/quote-request.dto";
+import { ListIntentsQueryDto } from "./dto/list-intents-query.dto";
 
 @ApiTags("intents")
 @Controller("api/v1/intents")
@@ -31,21 +32,14 @@ export class IntentsController {
   ) {}
 
   @Get()
-  list(
-    @Query("state") state?: string,
-    @Query("user") user?: string,
-    @Query("chain") chain?: string,
-    @Query("limit") limitRaw = "20",
-    @Query("offset") offsetRaw = "0",
-  ) {
+  list(@Query() query: ListIntentsQueryDto) {
+    const { state, user, chain, limit = 20, offset = 0 } = query;
     let intents = this.intentsService.getAll();
 
     if (state) intents = intents.filter((i) => i.state === state);
     if (user) intents = intents.filter((i) => i.user.toLowerCase() === user.toLowerCase());
     if (chain) intents = intents.filter((i) => i.srcChain === chain);
 
-    const limit = Math.min(parseInt(limitRaw, 10), 100);
-    const offset = parseInt(offsetRaw, 10);
     const page = intents.slice(offset, offset + limit);
 
     return { intents: page, total: intents.length, limit, offset };
@@ -140,8 +134,14 @@ export class IntentsController {
       throw new GoneException("Fill window has expired");
     }
 
-    const fillAmount = BigInt(dto.fillAmount);
-    const minAmount = BigInt(intent.minDstAmount);
+    let fillAmount: bigint;
+    let minAmount: bigint;
+    try {
+      fillAmount = BigInt(dto.fillAmount);
+      minAmount = BigInt(intent.minDstAmount);
+    } catch {
+      throw new BadRequestException("Invalid fillAmount or minDstAmount numeric format");
+    }
     if (fillAmount < minAmount) {
       throw new BadRequestException({
         error: "Fill amount below minimum",

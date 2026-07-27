@@ -44,6 +44,14 @@ describe("IntentsController (e2e)", () => {
     expect(res.body.limit).toBe(2);
   });
 
+  it("GET /api/v1/intents returns 400 when limit or offset is non-numeric", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/intents")
+      .query({ limit: "abc" })
+      .expect(400);
+    expect(res.body.error).toBe("Validation failed");
+  });
+
   it("GET /api/v1/intents/open returns only open intents", async () => {
     const res = await request(app.getHttpServer()).get("/api/v1/intents/open").expect(200);
     expect(res.body.intents.every((i: { state: string }) => i.state === "open")).toBe(true);
@@ -112,6 +120,19 @@ describe("IntentsController (e2e)", () => {
       fillAmount: "1",
       minDstAmount: validCreateBody.minDstAmount,
     });
+  });
+
+  it("POST /api/v1/intents/:id/fill returns 400 when fillAmount is non-numeric", async () => {
+    const created = await createIntent({ user: "GMALFORMEDFILL12345" });
+    await request(app.getHttpServer())
+      .post(`/api/v1/intents/${created.intentId}/accept`)
+      .send({ solver: "SOLVER_ALPHA" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/intents/${created.intentId}/fill`)
+      .send({ solver: "SOLVER_ALPHA", fillAmount: "invalid-number" })
+      .expect(400);
   });
 
   it("accept with an unknown/inactive solver is forbidden", async () => {
